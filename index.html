@@ -16,6 +16,7 @@
         touch-action: none;
       }
     </style>
+    <script src="https://cdn.babylonjs.com/loaders/babylon.glTF2FileLoader.min.js"></script>
   </head>
   <body>
     <canvas id="renderCanvas"></canvas>
@@ -49,12 +50,28 @@
           scene
         );
 
-        // Add a sphere to the scene
-        const sphere = BABYLON.MeshBuilder.CreateSphere(
-          "sphere",
-          { diameter: 1 },
-          scene
+        // Load my gLTF model
+        BABYLON.SceneLoader.ImportMesh(
+          "",
+          "models/",
+          "SAMII.glb",
+          scene,
+          function (meshes) {
+            const importedMesh = meshes[0];
+            importedMesh.position = new BABYLON.Vector3(0, 0, 0); // Set position
+          },
+          null,
+          function (scene, messafe, exception) {
+            console.error("Error loading the model:", message, exception);
+          }
         );
+
+        // Add a sphere to the scene
+        // const sphere = BABYLON.MeshBuilder.CreateSphere(
+        //   "sphere",
+        //   { diameter: 1 },
+        //   scene
+        // );
 
         // Enable VR experience
         const xrPromise = scene.createDefaultXRExperienceAsync({
