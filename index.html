@@ -50,6 +50,23 @@
           scene
         );
 
+        // Add a floor mesh
+        const floor = BABYLON.MeshBuilder.CreateGround(
+          "floor",
+          { width: 10, height: 10 },
+          scene
+        );
+
+        // Add a material to the floor
+        const floorMaterial = new BABYLON.StandardMaterial(
+          "floorMaterial",
+          scene
+        );
+        floorMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.5, 0.5); // gray floor for now
+
+        // Apply the material to the floor mesh
+        floor.material = floorMaterial;
+
         // Load my gLTF model
         BABYLON.SceneLoader.ImportMesh(
           "",
@@ -75,12 +92,35 @@
 
         // Enable VR experience
         const xrPromise = scene.createDefaultXRExperienceAsync({
+          floorMeshes: [floor], // Add the floor mesh to the VR experience
           // Optional configuration options
         });
 
         xrPromise
           .then((xr) => {
-            // XR experience is ready
+            const teleportation =
+              xr.baseExperience.featuresManager.getEnabledFeature(
+                BABYLON.WebXRFeatureName.TELEPORTATION
+              );
+
+            if (teleportation) {
+              // Force teleportation to be controlled by a specific hand
+              teleportation.forceHandedness = "left"; // Options: "left", "right", or undefined for both
+
+              // Enable main component only to disable thumbstick teleportation
+              teleportation.useMainComponentOnly = true;
+              // Enable or disable in-place rotation
+              teleportation.rotationEnabled = true; // Default is true
+
+              // Set the rotation angle for each thumbstick movement (in radians)
+              teleportation.rotationAngle = Math.PI / 8; // 22.5 degrees
+
+              // Enable or disable backward movement
+              teleportation.backwardsMovementEnabled = true; // Default is true
+
+              // Set the backward teleportation distance
+              teleportation.backwardsTeleportationDistance = 0.7; // Default is 0.7 meters
+            }
           })
           .catch((error) => {
             console.error("Error initializing XR experience:", error);
