@@ -110,6 +110,9 @@
                 teleportation.backwardsMovementEnabled = true;
                 teleportation.backwardsTeleportationDistance = 0.7;
               }
+
+              // Set up interaction detection after XR is initialized
+              setupInteractionDetection(xr, scene);
             })
             .catch((error) => {
               console.error("Error initializing XR experience:", error);
@@ -150,17 +153,20 @@
           }
         );
 
-        setupInteractionDetection(trigger1, sound1, scene);
+        // Store trigger and sound for later use
+        scene.metadata = scene.metadata || {};
+        scene.metadata.triggers = scene.metadata.triggers || [];
+        scene.metadata.triggers.push({ trigger: trigger1, sound: sound1 });
       }
 
-      function setupInteractionDetection(trigger, sound, scene) {
-        scene.createDefaultXRExperienceAsync().then((xr) => {
-          const xrInput = xr.input;
+      function setupInteractionDetection(xr, scene) {
+        const xrInput = xr.input;
 
-          xrInput.onControllerAddedObservable.add((controller) => {
-            const xrPointer = controller.pointer;
+        xrInput.onControllerAddedObservable.add((controller) => {
+          const xrPointer = controller.pointer;
 
-            scene.registerBeforeRender(() => {
+          scene.registerBeforeRender(() => {
+            scene.metadata.triggers.forEach(({ trigger, sound }) => {
               if (xrPointer && xrPointer.intersectsMesh(trigger, false)) {
                 if (!sound.isPlaying) {
                   sound.play();
