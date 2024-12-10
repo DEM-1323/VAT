@@ -14,155 +14,131 @@
         width: 100%;
         height: 100%;
         touch-action: none;
+        display: none; /* Hide canvas initially */
+      }
+      #startButton {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 10px 20px;
+        font-size: 20px;
+        cursor: pointer;
       }
     </style>
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/loaders/babylon.glTF2FileLoader.min.js"></script>
   </head>
   <body>
+    <button id="startButton">Start Experience</button>
     <canvas id="renderCanvas"></canvas>
     <script>
-      // Get the canvas element
-      const canvas = document.getElementById("renderCanvas");
+      document.getElementById("startButton").addEventListener("click", () => {
+        document.getElementById("startButton").style.display = "none";
+        document.getElementById("renderCanvas").style.display = "block";
+        initializeScene();
+      });
 
-      // Generate the Babylon.js 3D engine
-      const engine = new BABYLON.Engine(canvas, true);
+      function initializeScene() {
+        const canvas = document.getElementById("renderCanvas");
+        const engine = new BABYLON.Engine(canvas, true);
 
-      // Create the scene
-      const createScene = function () {
-        const scene = new BABYLON.Scene(engine);
+        const createScene = function () {
+          const scene = new BABYLON.Scene(engine);
 
-        // Add a camera to the scene
-        const camera = new BABYLON.ArcRotateCamera(
-          "Camera",
-          Math.PI / 2,
-          Math.PI / 2,
-          2,
-          BABYLON.Vector3.Zero(),
-          scene
-        );
-        camera.attachControl(canvas, true);
+          const camera = new BABYLON.ArcRotateCamera(
+            "Camera",
+            Math.PI / 2,
+            Math.PI / 2,
+            2,
+            BABYLON.Vector3.Zero(),
+            scene
+          );
+          camera.attachControl(canvas, true);
 
-        // Add a light to the scene
-        const light = new BABYLON.HemisphericLight(
-          "light",
-          new BABYLON.Vector3(1, 1, 0),
-          scene
-        );
+          const light = new BABYLON.HemisphericLight(
+            "light",
+            new BABYLON.Vector3(1, 1, 0),
+            scene
+          );
 
-        // Add a floor mesh
-        const floor = BABYLON.MeshBuilder.CreateGround(
-          "floor",
-          { width: 10, height: 10 },
-          scene
-        );
+          const floor = BABYLON.MeshBuilder.CreateGround(
+            "floor",
+            { width: 10, height: 10 },
+            scene
+          );
 
-        // Add a material to the floor
-        const floorMaterial = new BABYLON.StandardMaterial(
-          "floorMaterial",
-          scene
-        );
-        floorMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.5, 0.5); // gray floor for now
+          const floorMaterial = new BABYLON.StandardMaterial(
+            "floorMaterial",
+            scene
+          );
+          floorMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.5, 0.5);
+          floor.material = floorMaterial;
 
-        // Apply the material to the floor mesh
-        floor.material = floorMaterial;
-
-        // Load my gLTF model
-        BABYLON.SceneLoader.ImportMesh(
-          "",
-          "models/",
-          "SAMII.glb",
-          scene,
-          function (meshes) {
-            const importedMesh = meshes[0];
-            importedMesh.position = new BABYLON.Vector3(0, 0, 0); // Set position
-
-            setupTriggerPoints(importedMesh);
-          },
-          null,
-          function (scene, message, exception) {
-            console.error("Error loading the model:", message, exception);
-          }
-        );
-
-        // Add a sphere to the scene
-        // const sphere = BABYLON.MeshBuilder.CreateSphere(
-        //   "sphere",
-        //   { diameter: 1 },
-        //   scene
-        // );
-
-        // Enable VR experience
-        const xrPromise = scene.createDefaultXRExperienceAsync({
-          floorMeshes: [floor], // Add the floor mesh to the VR experience
-          // Optional configuration options
-        });
-
-        xrPromise
-          .then((xr) => {
-            const teleportation =
-              xr.baseExperience.featuresManager.getEnabledFeature(
-                BABYLON.WebXRFeatureName.TELEPORTATION
-              );
-
-            if (teleportation) {
-              // Force teleportation to be controlled by a specific hand
-              teleportation.forceHandedness = "left"; // Options: "left", "right", or undefined for both
-
-              // Enable main component only to disable thumbstick teleportation
-              teleportation.useMainComponentOnly = true;
-              // Enable or disable in-place rotation
-              teleportation.rotationEnabled = true; // Default is true
-
-              // Set the rotation angle for each thumbstick movement (in radians)
-              teleportation.rotationAngle = Math.PI / 8; // 22.5 degrees
-
-              // Enable or disable backward movement
-              teleportation.backwardsMovementEnabled = true; // Default is true
-
-              // Set the backward teleportation distance
-              teleportation.backwardsTeleportationDistance = 0.7; // Default is 0.7 meters
+          BABYLON.SceneLoader.ImportMesh(
+            "",
+            "models/",
+            "SAMII.glb",
+            scene,
+            function (meshes) {
+              const importedMesh = meshes[0];
+              importedMesh.position = new BABYLON.Vector3(0, 0, 0);
+              setupTriggerPoints(importedMesh, scene);
+            },
+            null,
+            function (scene, message, exception) {
+              console.error("Error loading the model:", message, exception);
             }
-          })
-          .catch((error) => {
-            console.error("Error initializing XR experience:", error);
+          );
+
+          const xrPromise = scene.createDefaultXRExperienceAsync({
+            floorMeshes: [floor],
           });
 
-        return scene;
-      };
+          xrPromise
+            .then((xr) => {
+              const teleportation =
+                xr.baseExperience.featuresManager.getEnabledFeature(
+                  BABYLON.WebXRFeatureName.TELEPORTATION
+                );
 
-      const scene = createScene();
+              if (teleportation) {
+                teleportation.forceHandedness = "left";
+                teleportation.useMainComponentOnly = true;
+                teleportation.rotationEnabled = true;
+                teleportation.rotationAngle = Math.PI / 8;
+                teleportation.backwardsMovementEnabled = true;
+                teleportation.backwardsTeleportationDistance = 0.7;
+              }
+            })
+            .catch((error) => {
+              console.error("Error initializing XR experience:", error);
+            });
 
-      // Register a render loop to repeatedly render the scene
-      engine.runRenderLoop(function () {
-        scene.render();
-      });
+          return scene;
+        };
 
-      // Watch for browser/canvas resize events
-      window.addEventListener("resize", function () {
-        engine.resize();
-      });
+        const scene = createScene();
 
-      function setupTriggerPoints(importedMesh) {
+        engine.runRenderLoop(function () {
+          scene.render();
+        });
+
+        window.addEventListener("resize", function () {
+          engine.resize();
+        });
+      }
+
+      function setupTriggerPoints(importedMesh, scene) {
         const trigger1 = BABYLON.MeshBuilder.CreateSphere(
           "trigger1",
           { diameter: 0.1 },
           scene
         );
-        trigger1.position = new BABYLON.Vector3(0, 0.5, 0.5); // Replace with actual coordinates
-        // trigger1.isVisible = false; // Make the trigger invisible
-        trigger1.parent = importedMesh; // Parent to the model
+        trigger1.position = new BABYLON.Vector3(0, 0.5, 0.5);
+        // trigger1.isVisible = false;
+        trigger1.parent = importedMesh;
 
-        // const trigger2 = BABYLON.MeshBuilder.CreateSphere(
-        //   "trigger2",
-        //   { diameter: 0.1 },
-        //   scene
-        // );
-        // trigger2.position = new BABYLON.Vector3(x2, y2, z2);
-        // trigger2.isVisible = false;
-        // trigger2.parent = importedMesh;
-
-        // Load and configure sounds
         const sound1 = new BABYLON.Sound(
           "sound1",
           "audio/Bronchial.mp3",
@@ -174,31 +150,18 @@
           }
         );
 
-        // const sound2 = new BABYLON.Sound(
-        //   "sound2",
-        //   "sounds/sound2.mp3",
-        //   scene,
-        //   null,
-        //   {
-        //     loop: true,
-        //     autoplay: false,
-        //   }
-        // );
-
-        // Set up interaction detection
-        setupInteractionDetection(trigger1, sound1);
-        // setupInteractionDetection(trigger2, sound2);
+        setupInteractionDetection(trigger1, sound1, scene);
       }
 
-      function setupInteractionDetection(trigger, sound) {
-        xrPromise.then((xr) => {
+      function setupInteractionDetection(trigger, sound, scene) {
+        scene.createDefaultXRExperienceAsync().then((xr) => {
           const xrInput = xr.input;
 
           xrInput.onControllerAddedObservable.add((controller) => {
             const xrPointer = controller.pointer;
 
             scene.registerBeforeRender(() => {
-              if (xrPointer.intersectsMesh(trigger, false)) {
+              if (xrPointer && xrPointer.intersectsMesh(trigger, false)) {
                 if (!sound.isPlaying) {
                   sound.play();
                 }
