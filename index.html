@@ -14,7 +14,7 @@
         width: 100%;
         height: 100%;
         touch-action: none;
-        display: none; /* Hide canvas initially */
+        display: none;
       }
       #startButton {
         position: absolute;
@@ -33,18 +33,60 @@
     <button id="startButton">Start Experience</button>
     <canvas id="renderCanvas"></canvas>
     <script>
-      document.getElementById("startButton").addEventListener("click", () => {
-        document.getElementById("startButton").style.display = "none";
-        document.getElementById("renderCanvas").style.display = "block";
-        initializeScene();
-      });
+      let audioContext;
+      let scene;
+      let sounds = {};
+
+      document
+        .getElementById("startButton")
+        .addEventListener("click", async () => {
+          audioContext = new (window.AudioContext ||
+            window.webkitAudioContext)();
+          if (audioContext.state === "suspended") {
+            await audioContext.resume();
+          }
+
+          document.getElementById("startButton").style.display = "none";
+          document.getElementById("renderCanvas").style.display = "block";
+          initializeScene();
+        });
+
+      function createSounds(scene) {
+        console.log("Creating sound objects...");
+
+        sounds.bronchial = new BABYLON.Sound(
+          "bronchialSound",
+          "audio/Bronchial.mp3",
+          scene,
+          function () {
+            console.log("Bronchial sound loaded successfully");
+          },
+          {
+            loop: true,
+            autoplay: false,
+            spatialSound: true,
+            distanceModel: "linear",
+            maxDistance: 100,
+            rolloffFactor: 1,
+          }
+        );
+
+        sounds.bronchial.onLoadError = function (error) {
+          console.error("Error loading bronchial sound:", error);
+        };
+      }
 
       function initializeScene() {
         const canvas = document.getElementById("renderCanvas");
         const engine = new BABYLON.Engine(canvas, true);
 
         const createScene = function () {
-          const scene = new BABYLON.Scene(engine);
+          scene = new BABYLON.Scene(engine);
+          scene.audioEnabled = true;
+          scene.audioPositioningRefreshRate = 100;
+
+          // Create sounds first
+          createSounds(scene);
 
           const camera = new BABYLON.ArcRotateCamera(
             "Camera",
@@ -83,7 +125,7 @@
             function (meshes) {
               const importedMesh = meshes[0];
               importedMesh.position = new BABYLON.Vector3(0, 0, 0);
-              setupTriggerPoints(importedMesh, scene);
+              createTriggerPoints(importedMesh);
             },
             null,
             function (scene, message, exception) {
@@ -95,33 +137,64 @@
             floorMeshes: [floor],
           });
 
-          xrPromise
-            .then((xr) => {
-              const teleportation =
-                xr.baseExperience.featuresManager.getEnabledFeature(
-                  BABYLON.WebXRFeatureName.TELEPORTATION
-                );
+          xrPromise.then((xr) => {
+            xr.input.onControllerAddedObservable.add((controller) => {
+              const controllerSphere = BABYLON.MeshBuilder.CreateSphere(
+                "controller",
+                {
+                  diameter: 0.1,
+                  segments: 8,
+                },
+                scene
+              );
+              controllerSphere.isVisible = false;
 
-              if (teleportation) {
-                teleportation.forceHandedness = "left";
-                teleportation.useMainComponentOnly = true;
-                teleportation.rotationEnabled = true;
-                teleportation.rotationAngle = Math.PI / 8;
-                teleportation.backwardsMovementEnabled = true;
-                teleportation.backwardsTeleportationDistance = 0.7;
-              }
+              // Use a single variable to track intersection state
+              let lastIntersectionState = false;
 
-              // Set up interaction detection after XR is initialized
-              setupInteractionDetection(xr, scene);
-            })
-            .catch((error) => {
-              console.error("Error initializing XR experience:", error);
+              scene.registerBeforeRender(() => {
+                // Check if metadata and triggers exist before proceeding
+                if (!scene.metadata?.triggers) return;
+
+                if (controller.grip) {
+                  controllerSphere.position = controller.grip.position;
+
+                  // Get the current intersection state and the corresponding trigger data
+                  const intersectingTrigger = scene.metadata.triggers.find(
+                    (triggerData) =>
+                      controllerSphere.intersectsMesh(
+                        triggerData.trigger,
+                        false
+                      )
+                  );
+
+                  const isCurrentlyIntersecting = !!intersectingTrigger;
+
+                  // Only take action when the state changes
+                  if (isCurrentlyIntersecting !== lastIntersectionState) {
+                    if (isCurrentlyIntersecting && intersectingTrigger.sound) {
+                      console.log(`Playing ${intersectingTrigger.sound.name}`);
+                      intersectingTrigger.sound.play();
+                    } else {
+                      // Find the previously playing sound and stop it
+                      scene.metadata.triggers.forEach((triggerData) => {
+                        if (triggerData.sound && triggerData.sound.isPlaying) {
+                          console.log(`Stopping ${triggerData.sound.name}`);
+                          triggerData.sound.stop();
+                        }
+                      });
+                    }
+                    lastIntersectionState = isCurrentlyIntersecting;
+                  }
+                }
+              });
             });
+          });
 
           return scene;
         };
 
-        const scene = createScene();
+        scene = createScene();
 
         engine.runRenderLoop(function () {
           scene.render();
@@ -132,52 +205,27 @@
         });
       }
 
-      function setupTriggerPoints(importedMesh, scene) {
+      function createTriggerPoints(importedMesh) {
         const trigger1 = BABYLON.MeshBuilder.CreateSphere(
           "trigger1",
-          { diameter: 0.1 },
+          { diameter: 0.2 },
           scene
         );
         trigger1.position = new BABYLON.Vector3(0, 0.5, 0.5);
-        // trigger1.isVisible = false;
+        trigger1.isVisible = true;
         trigger1.parent = importedMesh;
 
-        const sound1 = new BABYLON.Sound(
-          "sound1",
-          "audio/Bronchial.mp3",
-          scene,
-          null,
-          {
-            loop: true,
-            autoplay: false,
-          }
-        );
-
-        // Store trigger and sound for later use
+        // Store trigger points and attach corresponding sounds
         scene.metadata = scene.metadata || {};
         scene.metadata.triggers = scene.metadata.triggers || [];
-        scene.metadata.triggers.push({ trigger: trigger1, sound: sound1 });
-      }
 
-      function setupInteractionDetection(xr, scene) {
-        const xrInput = xr.input;
+        // Attach the bronchial sound to the trigger point
+        sounds.bronchial.attachToMesh(trigger1);
 
-        xrInput.onControllerAddedObservable.add((controller) => {
-          const xrPointer = controller.pointer;
-
-          scene.registerBeforeRender(() => {
-            scene.metadata.triggers.forEach(({ trigger, sound }) => {
-              if (xrPointer && xrPointer.intersectsMesh(trigger, false)) {
-                if (!sound.isPlaying) {
-                  sound.play();
-                }
-              } else {
-                if (sound.isPlaying) {
-                  sound.stop();
-                }
-              }
-            });
-          });
+        scene.metadata.triggers.push({
+          trigger: trigger1,
+          sound: sounds.bronchial,
+          isIntersecting: false,
         });
       }
     </script>
