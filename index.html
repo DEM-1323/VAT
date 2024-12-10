@@ -76,6 +76,8 @@
           function (meshes) {
             const importedMesh = meshes[0];
             importedMesh.position = new BABYLON.Vector3(0, 0, 0); // Set position
+
+            setupTriggerPoints(importedMesh);
           },
           null,
           function (scene, message, exception) {
@@ -140,6 +142,75 @@
       window.addEventListener("resize", function () {
         engine.resize();
       });
+
+      function setupTriggerPoints(importedMesh) {
+        const trigger1 = BABYLON.MeshBuilder.CreateSphere(
+          "trigger1",
+          { diameter: 0.1 },
+          scene
+        );
+        trigger1.position = new BABYLON.Vector3(0, 0.5, 0.5); // Replace with actual coordinates
+        // trigger1.isVisible = false; // Make the trigger invisible
+        trigger1.parent = importedMesh; // Parent to the model
+
+        // const trigger2 = BABYLON.MeshBuilder.CreateSphere(
+        //   "trigger2",
+        //   { diameter: 0.1 },
+        //   scene
+        // );
+        // trigger2.position = new BABYLON.Vector3(x2, y2, z2);
+        // trigger2.isVisible = false;
+        // trigger2.parent = importedMesh;
+
+        // Load and configure sounds
+        const sound1 = new BABYLON.Sound(
+          "sound1",
+          "audio/Bronchial.mp3",
+          scene,
+          null,
+          {
+            loop: true,
+            autoplay: false,
+          }
+        );
+
+        // const sound2 = new BABYLON.Sound(
+        //   "sound2",
+        //   "sounds/sound2.mp3",
+        //   scene,
+        //   null,
+        //   {
+        //     loop: true,
+        //     autoplay: false,
+        //   }
+        // );
+
+        // Set up interaction detection
+        setupInteractionDetection(trigger1, sound1);
+        // setupInteractionDetection(trigger2, sound2);
+      }
+
+      function setupInteractionDetection(trigger, sound) {
+        xrPromise.then((xr) => {
+          const xrInput = xr.input;
+
+          xrInput.onControllerAddedObservable.add((controller) => {
+            const xrPointer = controller.pointer;
+
+            scene.registerBeforeRender(() => {
+              if (xrPointer.intersectsMesh(trigger, false)) {
+                if (!sound.isPlaying) {
+                  sound.play();
+                }
+              } else {
+                if (sound.isPlaying) {
+                  sound.stop();
+                }
+              }
+            });
+          });
+        });
+      }
     </script>
   </body>
 </html>
