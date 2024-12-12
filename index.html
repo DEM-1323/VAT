@@ -76,7 +76,7 @@
           Math.PI / 2,
           Math.PI / 2,
           2,
-          BABYLON.Vector3.Zero(),
+          new BABYLON.Vector3(0, 0.5, 0),
           scene
         );
         camera.attachControl(canvas, true);
@@ -94,9 +94,11 @@
         // Load the SAMII model and then create triggers
         loadModel(scene, "models/", "SAMII.glb")
           .then((importedMesh) => {
+            importedMesh.position = BABYLON.Vector3.Zero();
+            importedMesh.rotation = new BABYLON.Vector3(0, -2.9, 0);
             createTriggerPoints(scene, importedMesh, sounds);
 
-            // Now that triggers are ready, configure intersection actions for all currently known controllers
+            // triggers ready, apply intersection actions for all currently known controllers
             configureTriggerActionsForAllControllers(scene);
           })
           .catch((error) => {
@@ -116,7 +118,7 @@
           "floorMaterial",
           scene
         );
-        floorMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.5, 0.5);
+        floorMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.52, 0.5);
         floor.material = floorMaterial;
         return floor;
       }
@@ -141,6 +143,25 @@
         sounds.bronchial.onLoadError = function (error) {
           console.error("Error loading bronchial sound:", error);
         };
+
+        sounds.heart = new BABYLON.Sound(
+          "normalHeartSound",
+          "audio/Normal_heart.mp3",
+          scene,
+          () => console.log("Heart sound loaded successfully"),
+          {
+            loop: true,
+            autoplay: false,
+            spatialSound: true,
+            distanceModel: "linear",
+            maxDistance: 100,
+            rolloffFactor: 1,
+          }
+        );
+
+        sounds.heart.onLoadError = function (error) {
+          console.error("Error loading heart sound:", error);
+        };
       }
 
       function initializeXR(scene, floor) {
@@ -148,10 +169,8 @@
           .createDefaultXRExperienceAsync({ floorMeshes: [floor] })
           .then((xr) => {
             scene.metadata.xr = xr;
-            // Set onControllerAddedObservable once
             xr.input.onControllerAddedObservable.add((controller) => {
               console.log("Controller added:", controller);
-              // Store the controller
               scene.metadata.controllers.push(controller);
 
               // If triggers are already ready, set up actions immediately
@@ -198,10 +217,10 @@
       function createTriggerPoints(scene, importedMesh, sounds) {
         const trigger1 = BABYLON.MeshBuilder.CreateSphere(
           "trigger1",
-          { diameter: 0.2 },
+          { diameter: 0.1 },
           scene
         );
-        trigger1.position = new BABYLON.Vector3(0, 0.5, 0.5);
+        trigger1.position = new BABYLON.Vector3(0, 0.55, 0.1);
         trigger1.parent = importedMesh;
         trigger1.isVisible = true;
 
@@ -212,6 +231,25 @@
         scene.metadata.triggers.push({
           trigger: trigger1,
           sound: sounds.bronchial,
+          isIntersecting: false,
+        });
+
+        const trigger2 = BABYLON.MeshBuilder.CreateSphere(
+          "trigger2",
+          { diameter: 0.1 },
+          scene
+        );
+        trigger2.position = new BABYLON.Vector3(0.13, 0.47, 0.09);
+        trigger2.parent = importedMesh;
+        trigger2.isVisible = true;
+
+        // Attach the heart sound to trigger2
+        sounds.heart.attachToMesh(trigger2);
+
+        // Add trigger configuration
+        scene.metadata.triggers.push({
+          trigger: trigger2,
+          sound: sounds.heart,
           isIntersecting: false,
         });
       }
@@ -230,15 +268,11 @@
         });
       }
 
-      /**
-       * Configures actions for a single controller.
-       */
       function configureTriggerActionsForController(scene, controller) {
-        // Ensure we have triggers
         const { triggers } = scene.metadata;
         if (!triggers || triggers.length === 0) return;
 
-        // Ensure the controller has a grip (6DoF)
+        // Check if controller has a grip (6DoF)
         if (!controller.grip) return;
 
         triggers.forEach(({ trigger, sound }) => {
