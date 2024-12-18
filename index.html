@@ -28,6 +28,7 @@
     </style>
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/loaders/babylon.glTF2FileLoader.min.js"></script>
+    <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
   </head>
   <body>
     <button id="startButton">Start Experience</button>
@@ -37,6 +38,7 @@
       let scene;
       let sounds = {};
       let audioContext;
+      let triggersVisible = true;
 
       document
         .getElementById("startButton")
@@ -62,7 +64,6 @@
 
       function createScene(engine, canvas) {
         const scene = new BABYLON.Scene(engine);
-        // Initialize metadata once here
         scene.metadata = {
           triggers: [],
           controllers: [],
@@ -81,24 +82,31 @@
         );
         camera.attachControl(canvas, true);
 
-        const light = new BABYLON.HemisphericLight(
-          "light",
-          new BABYLON.Vector3(1, 1, 0),
+        // Add ambient light
+        const ambientLight = new BABYLON.HemisphericLight(
+          "ambientLight",
+          new BABYLON.Vector3(0, 1, 0),
           scene
         );
+        ambientLight.intensity = 0.7;
 
-        const floor = createFloor(scene);
+        // Add directional light for shadows and depth
+        const directionalLight = new BABYLON.DirectionalLight(
+          "directionalLight",
+          new BABYLON.Vector3(-1, -2, -1),
+          scene
+        );
+        directionalLight.intensity = 0.5;
+
+        const floor = createRoom(scene);
         createSounds(scene);
         initializeXR(scene, floor);
 
-        // Load the SAMII model and then create triggers
         loadModel(scene, "models/", "SAMII.glb")
           .then((importedMesh) => {
             importedMesh.position = BABYLON.Vector3.Zero();
             importedMesh.rotation = new BABYLON.Vector3(0, -2.9, 0);
             createTriggerPoints(scene, importedMesh, sounds);
-
-            // triggers ready, apply intersection actions for all currently known controllers
             configureTriggerActionsForAllControllers(scene);
           })
           .catch((error) => {
@@ -108,19 +116,151 @@
         return scene;
       }
 
-      function createFloor(scene) {
+      function createRoom(scene) {
+        // Room dimensions
+        const roomWidth = 5;
+        const roomDepth = 5;
+        const roomHeight = 3;
+        const wallThickness = 0.1;
+
+        // Create material for room elements
+        const roomMaterial = new BABYLON.StandardMaterial(
+          "roomMaterial",
+          scene
+        );
+        roomMaterial.diffuseColor = new BABYLON.Color3(0.95, 0.95, 0.95);
+        roomMaterial.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+
+        // Create floor
         const floor = BABYLON.MeshBuilder.CreateGround(
           "floor",
-          { width: 10, height: 10 },
+          { width: roomWidth, height: roomDepth },
           scene
         );
-        const floorMaterial = new BABYLON.StandardMaterial(
-          "floorMaterial",
+        floor.material = roomMaterial;
+
+        // Create ceiling
+        const ceiling = BABYLON.MeshBuilder.CreateGround(
+          "ceiling",
+          { width: roomWidth, height: roomDepth },
           scene
         );
-        floorMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.52, 0.5);
-        floor.material = floorMaterial;
+        ceiling.position.y = roomHeight;
+        ceiling.rotation.x = Math.PI;
+        ceiling.material = roomMaterial;
+
+        // Create walls that meet perfectly at corners
+        const wallConfigurations = [
+          // Front and back walls (full width)
+          {
+            position: new BABYLON.Vector3(0, roomHeight / 2, -roomDepth / 2),
+            dimensions: {
+              width: roomWidth,
+              height: roomHeight + 0.001,
+              depth: wallThickness,
+            },
+          },
+          {
+            position: new BABYLON.Vector3(0, roomHeight / 2, roomDepth / 2),
+            dimensions: {
+              width: roomWidth,
+              height: roomHeight + 0.001,
+              depth: wallThickness,
+            },
+          },
+          // Side walls (width reduced by wall thickness to fit perfectly)
+          {
+            position: new BABYLON.Vector3(-roomWidth / 2, roomHeight / 2, 0),
+            dimensions: {
+              width: wallThickness,
+              height: roomHeight + 0.001,
+              depth: roomDepth + wallThickness,
+            },
+          },
+          {
+            position: new BABYLON.Vector3(roomWidth / 2, roomHeight / 2, 0),
+            dimensions: {
+              width: wallThickness,
+              height: roomHeight + 0.001,
+              depth: roomDepth + wallThickness,
+            },
+          },
+        ];
+
+        wallConfigurations.forEach((config, index) => {
+          const wall = BABYLON.MeshBuilder.CreateBox(
+            `wall${index}`,
+            config.dimensions,
+            scene
+          );
+          // Position walls to start from floor level instead of being centered
+          wall.position = new BABYLON.Vector3(
+            config.position.x,
+            config.dimensions.height / 2 + 0.1,
+            config.position.z
+          );
+          wall.material = roomMaterial;
+        });
+
+        // Add baseboards with matching dimensions
+        const baseboardMaterial = new BABYLON.StandardMaterial(
+          "baseboardMaterial",
+          scene
+        );
+        baseboardMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.2, 0.2);
+
+        wallConfigurations.forEach((config, index) => {
+          const baseboard = BABYLON.MeshBuilder.CreateBox(
+            `baseboard${index}`,
+            {
+              width: config.dimensions.width,
+              height: 0.1,
+              depth: config.dimensions.depth,
+            },
+            scene
+          );
+          baseboard.position = new BABYLON.Vector3(
+            config.position.x,
+            0.05,
+            config.position.z
+          );
+          baseboard.material = baseboardMaterial;
+        });
+
         return floor;
+      }
+
+      function createControllerUI(xrInput) {
+        const guiManager = new BABYLON.GUI.GUI3DManager(scene);
+
+        const button = new BABYLON.GUI.HolographicButton("toggleButton");
+        guiManager.addControl(button);
+
+        button.scaling = new BABYLON.Vector3(0.15, 0.15, 0.15);
+
+        const text = new BABYLON.GUI.TextBlock();
+        text.text = "Hide Triggers";
+        text.color = "white";
+        text.fontSize = 36;
+        button.content = text;
+
+        xrInput.onControllerAddedObservable.add((controller) => {
+          if (controller.inputSource.handedness === "left") {
+            button.linkToTransformNode(controller.grip);
+
+            button.position = new BABYLON.Vector3(0, 0.08, 0.05);
+            button.rotation = new BABYLON.Vector3(-0.3, 0, 0);
+          }
+        });
+
+        button.onPointerDownObservable.add(() => {
+          triggersVisible = !triggersVisible;
+          text.text = triggersVisible ? "Hide Triggers" : "Show Triggers";
+
+          scene.metadata.triggers.forEach(({ trigger }) => {
+            trigger.isVisible = triggersVisible;
+          });
+        });
       }
 
       function createSounds(scene) {
@@ -166,14 +306,18 @@
 
       function initializeXR(scene, floor) {
         scene
-          .createDefaultXRExperienceAsync({ floorMeshes: [floor] })
+          .createDefaultXRExperienceAsync({
+            floorMeshes: [floor],
+          })
           .then((xr) => {
             scene.metadata.xr = xr;
+
+            createControllerUI(xr.input);
+
             xr.input.onControllerAddedObservable.add((controller) => {
               console.log("Controller added:", controller);
               scene.metadata.controllers.push(controller);
 
-              // If triggers are already ready, set up actions immediately
               if (
                 scene.metadata.triggers &&
                 scene.metadata.triggers.length > 0
@@ -187,13 +331,6 @@
           });
       }
 
-      /**
-       * Loads a 3D model (e.g., SAMII glb) into the scene.
-       * @param {BABYLON.Scene} scene
-       * @param {string} rootUrl
-       * @param {string} fileName
-       * @returns {Promise<BABYLON.AbstractMesh>}
-       */
       function loadModel(scene, rootUrl, fileName) {
         return new Promise((resolve, reject) => {
           BABYLON.SceneLoader.ImportMesh(
@@ -222,12 +359,10 @@
         );
         trigger1.position = new BABYLON.Vector3(0, 0.55, 0.1);
         trigger1.parent = importedMesh;
-        trigger1.isVisible = true;
+        trigger1.isVisible = triggersVisible;
 
-        // Attach the bronchial sound to trigger1
         sounds.bronchial.attachToMesh(trigger1);
 
-        // Add trigger configuration
         scene.metadata.triggers.push({
           trigger: trigger1,
           sound: sounds.bronchial,
@@ -241,12 +376,10 @@
         );
         trigger2.position = new BABYLON.Vector3(0.13, 0.47, 0.09);
         trigger2.parent = importedMesh;
-        trigger2.isVisible = true;
+        trigger2.isVisible = triggersVisible;
 
-        // Attach the heart sound to trigger2
         sounds.heart.attachToMesh(trigger2);
 
-        // Add trigger configuration
         scene.metadata.triggers.push({
           trigger: trigger2,
           sound: sounds.heart,
@@ -254,9 +387,6 @@
         });
       }
 
-      /**
-       * Configures actions for all currently known controllers with the loaded triggers.
-       */
       function configureTriggerActionsForAllControllers(scene) {
         const { triggers, controllers } = scene.metadata;
 
@@ -272,7 +402,6 @@
         const { triggers } = scene.metadata;
         if (!triggers || triggers.length === 0) return;
 
-        // Check if controller has a grip (6DoF)
         if (!controller.grip) return;
 
         triggers.forEach(({ trigger, sound }) => {
