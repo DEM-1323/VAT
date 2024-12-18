@@ -9,6 +9,15 @@
         height: 100%;
         margin: 0;
         overflow: hidden;
+        background-color: black;
+        color: white;
+      }
+      h1 {
+        text-align: center;
+        position: absolute;
+        top: 40%;
+        left: 50%;
+        transform: translate(-50%, -40%);
       }
       #renderCanvas {
         width: 100%;
@@ -24,6 +33,9 @@
         padding: 10px 20px;
         font-size: 20px;
         cursor: pointer;
+        border-color: green;
+        background-color: green;
+        color: white;
       }
     </style>
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
@@ -31,6 +43,7 @@
     <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
   </head>
   <body>
+    <h1 id="startMessage">Welcome to VR Auscultation Trainer</h1>
     <button id="startButton">Start Experience</button>
     <canvas id="renderCanvas"></canvas>
     <script>
@@ -44,23 +57,31 @@
 
       const SOUND_COLLECTIONS = {
         normal: {
-          bronchial: {
+          lung: {
             url: "audio/Bronchial.mp3",
             name: "Normal Bronchial",
           },
           heart: {
             url: "audio/Normal_heart.mp3",
             name: "Normal Heart",
+          },
+          crackles: {
+            url: "audio/Crackles_Fine.mp3",
+            name: "Fine Crackles",
           },
         },
-        abnormal: {
-          bronchial: {
+        intermediate: {
+          lung: {
             url: "audio/Bronchial.mp3",
             name: "Normal Bronchial",
           },
           heart: {
-            url: "audio/Normal_heart.mp3",
-            name: "Normal Heart",
+            url: "audio/Third_heart.mp3",
+            name: "Third Heart",
+          },
+          crackles: {
+            url: "audio/Crackles_Late_Inspiratory.mp3",
+            name: "Late Inspiratory Crackles",
           },
         },
       };
@@ -83,6 +104,7 @@
           await audioContext.resume();
         }
 
+        document.getElementById("startMessage").style.display = "none";
         document.getElementById("startButton").style.display = "none";
         document.getElementById("renderCanvas").style.display = "block";
 
@@ -283,11 +305,11 @@
         trigger1.parent = importedMesh;
         trigger1.isVisible = triggersVisible;
 
-        if (soundObjects.bronchial) {
-          soundObjects.bronchial.attachToMesh(trigger1);
+        if (soundObjects.lung) {
+          soundObjects.lung.attachToMesh(trigger1);
           scene.metadata.triggers.push({
             trigger: trigger1,
-            sound: soundObjects.bronchial,
+            sound: soundObjects.lung,
             isIntersecting: false,
           });
         }
@@ -306,6 +328,24 @@
           scene.metadata.triggers.push({
             trigger: trigger2,
             sound: soundObjects.heart,
+            isIntersecting: false,
+          });
+        }
+
+        const trigger3 = BABYLON.MeshBuilder.CreateSphere(
+          "trigger3",
+          { diameter: 0.1 },
+          scene
+        );
+        trigger3.position = new BABYLON.Vector3(0.12, 0.55, -0.06);
+        trigger3.parent = importedMesh;
+        trigger3.isVisible = triggersVisible;
+
+        if (soundObjects.crackles) {
+          soundObjects.crackles.attachToMesh(trigger3);
+          scene.metadata.triggers.push({
+            trigger: trigger3,
+            sound: soundObjects.crackles,
             isIntersecting: false,
           });
         }
@@ -457,8 +497,9 @@
         xrInput.onControllerAddedObservable.add((controller) => {
           if (controller.inputSource.handedness === "left") {
             stackPanel.linkToTransformNode(controller.grip);
-            stackPanel.position = new BABYLON.Vector3(0, 0.15, 0);
-            stackPanel.node.rotation = new BABYLON.Vector3(0, 0, 0);
+            stackPanel.position = new BABYLON.Vector3(0, 0.17, 0);
+            stackPanel.scaling = new BABYLON.Vector3(0.125, 0.125, 0.125);
+            stackPanel.node.rotation = new BABYLON.Vector3(Math.PI / 4, 0, 0);
           }
         });
       }
