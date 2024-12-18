@@ -91,6 +91,8 @@
         soundObjects: {},
       };
 
+      let currentlyPlayingText;
+
       // ==========================================================
       // Entry Point - User Interaction
       // ==========================================================
@@ -185,15 +187,12 @@
       // ==========================================================
       // Sound Handling
       // ==========================================================
-      // Creates initial sounds by loading the currently active collection
       function createSounds(scene) {
         return loadSoundCollection(scene, sounds.activeCollection);
       }
 
       async function loadSoundCollection(scene, collectionName) {
-        console.log(`Loading sound collection: ${collectionName}`);
-
-        // Dispose of old sounds if any
+        // Clear and dispose old sounds
         Object.values(sounds.soundObjects).forEach((sound) => {
           if (sound.isPlaying) {
             sound.stop();
@@ -203,16 +202,21 @@
 
         sounds.soundObjects = {};
         sounds.activeCollection = collectionName;
+
+        console.log(`Loading sound collection: ${collectionName}...`);
         const collection = SOUND_COLLECTIONS[collectionName];
 
         const loadPromises = Object.entries(collection).map(
           ([key, soundData]) => {
             return new Promise((resolve, reject) => {
-              sounds.soundObjects[key] = new BABYLON.Sound(
+              const sound = new BABYLON.Sound(
                 soundData.name,
                 soundData.url,
                 scene,
-                resolve,
+                () => {
+                  console.log(`Loaded sound: ${soundData.name}`);
+                  resolve();
+                },
                 {
                   loop: true,
                   autoplay: false,
@@ -223,36 +227,48 @@
                 }
               );
 
-              sounds.soundObjects[key].onLoadError = (error) => {
+              sound.onLoadError = (error) => {
                 console.error(`Error loading ${soundData.name}:`, error);
                 reject(error);
               };
+
+              sounds.soundObjects[key] = sound;
             });
           }
         );
 
         try {
           await Promise.all(loadPromises);
-          console.log(
-            `Successfully loaded sound collection: ${collectionName}`
-          );
-          updateTriggerSounds(scene);
+          console.log(`All sounds loaded for collection: ${collectionName}`);
+          await updateTriggerSounds(scene);
+          return true;
         } catch (error) {
           console.error("Error loading sound collection:", error);
+          return false;
         }
       }
 
-      // Update existing triggers with newly loaded sounds
       function updateTriggerSounds(scene) {
-        if (!scene.metadata.triggers) return;
+        if (!scene.metadata.triggers) {
+          return;
+        }
 
-        scene.metadata.triggers.forEach((triggerData) => {
-          const soundKey = Object.keys(sounds.soundObjects).find((key) =>
-            triggerData.sound.name.toLowerCase().includes(key)
-          );
+        scene.metadata.triggers.forEach((triggerData, index) => {
+          let soundKey;
+          switch (index) {
+            case 0:
+              soundKey = "lung";
+              break;
+            case 1:
+              soundKey = "heart";
+              break;
+            case 2:
+              soundKey = "crackles";
+              break;
+          }
 
           if (soundKey && sounds.soundObjects[soundKey]) {
-            if (triggerData.sound.isPlaying) {
+            if (triggerData.sound && triggerData.sound.isPlaying) {
               triggerData.sound.stop();
             }
 
@@ -265,13 +281,6 @@
       // ==========================================================
       // Model Loading
       // ==========================================================
-      /**
-       * Loads a 3D model (e.g., SAMII glb) into the scene.
-       * @param {BABYLON.Scene} scene
-       * @param {string} rootUrl
-       * @param {string} fileName
-       * @returns {Promise<BABYLON.AbstractMesh>}
-       */
       function loadModel(scene, rootUrl, fileName) {
         return new Promise((resolve, reject) => {
           BABYLON.SceneLoader.ImportMesh(
@@ -362,7 +371,6 @@
             createControllerUI(xr.input);
 
             xr.input.onControllerAddedObservable.add((controller) => {
-              console.log("Controller added:", controller);
               scene.metadata.controllers.push(controller);
               if (
                 scene.metadata.triggers &&
@@ -392,7 +400,8 @@
         if (!triggers || triggers.length === 0) return;
         if (!controller.grip) return;
 
-        triggers.forEach(({ trigger, sound }) => {
+        triggers.forEach((triggerData) => {
+          const { trigger } = triggerData;
           if (!trigger.actionManager) {
             trigger.actionManager = new BABYLON.ActionManager(scene);
           }
@@ -407,9 +416,11 @@
                 },
               },
               () => {
-                if (!sound.isPlaying) {
-                  console.log(`Playing ${sound.name}`);
+                const sound = triggerData.sound;
+                if (sound && !sound.isPlaying) {
                   sound.play();
+                  console.log(`Playing ${sound.name}`);
+                  updateCurrentlyPlayingText(sound.name);
                 }
               }
             )
@@ -425,14 +436,23 @@
                 },
               },
               () => {
-                if (sound.isPlaying) {
+                const sound = triggerData.sound;
+                if (sound && sound.isPlaying) {
                   console.log(`Stopping ${sound.name}`);
                   sound.stop();
+                  updateCurrentlyPlayingText("No sound playing");
                 }
               }
             )
           );
         });
+      }
+
+      // Updates the currently playing sound text block
+      function updateCurrentlyPlayingText(text) {
+        if (currentlyPlayingText) {
+          currentlyPlayingText.text = `Currently: ${text}`;
+        }
       }
 
       // ==========================================================
@@ -492,6 +512,19 @@
           soundText.text = `Sound: ${newCollection}`;
           await loadSoundCollection(scene, newCollection);
         });
+
+        // Add a text label to show currently playing sound
+        const currentlyPlayingLabel = new BABYLON.GUI.HolographicButton(
+          "currentlyPlayingLabel"
+        );
+        currentlyPlayingLabel.isPointerBlocker = false; // Not interactive
+        stackPanel.addControl(currentlyPlayingLabel);
+
+        currentlyPlayingText = new BABYLON.GUI.TextBlock();
+        currentlyPlayingText.text = "Currently: No sound playing";
+        currentlyPlayingText.color = "white";
+        currentlyPlayingText.fontSize = 20;
+        currentlyPlayingLabel.content = currentlyPlayingText;
 
         // Link UI to left-hand controller when available
         xrInput.onControllerAddedObservable.add((controller) => {
