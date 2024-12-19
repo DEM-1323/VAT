@@ -53,7 +53,7 @@
       let engine;
       let scene;
       let audioContext;
-      let triggersVisible = true;
+      let triggersVisible = false;
 
       const SOUND_COLLECTIONS = {
         normal: {
@@ -461,7 +461,6 @@
       function createControllerUI(xrInput) {
         const manager = new BABYLON.GUI.GUI3DManager(scene);
 
-        // Create a stack panel
         const stackPanel = new BABYLON.GUI.StackPanel3D();
         stackPanel.margin = 0.02;
         manager.addControl(stackPanel);
@@ -513,7 +512,7 @@
           await loadSoundCollection(scene, newCollection);
         });
 
-        // Add a text label to show currently playing sound
+        // text label to show currently playing sound
         const currentlyPlayingLabel = new BABYLON.GUI.HolographicButton(
           "currentlyPlayingLabel"
         );
@@ -554,6 +553,10 @@
           "roomMaterial",
           scene
         );
+        roomMaterial.diffuseTexture = new BABYLON.Texture(
+          "textures/wall_texture.jpg",
+          scene
+        );
         roomMaterial.diffuseColor = new BABYLON.Color3(0.95, 0.95, 0.95);
         roomMaterial.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
 
@@ -562,7 +565,17 @@
           { width: roomWidth, height: roomDepth },
           scene
         );
-        floor.material = roomMaterial;
+        const floorMaterial = new BABYLON.StandardMaterial(
+          "floorMaterial",
+          scene
+        );
+        floorMaterial.diffuseTexture = new BABYLON.Texture(
+          "textures/floor_texture.jpg",
+          scene
+        );
+        floorMaterial.diffuseTexture.uScale = 2; // repeats texture horizontally
+        floorMaterial.diffuseTexture.vScale = 2; // repeats texture vertically
+        floor.material = floorMaterial;
 
         const ceiling = BABYLON.MeshBuilder.CreateGround(
           "ceiling",
