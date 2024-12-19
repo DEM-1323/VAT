@@ -4,7 +4,7 @@ Welcome to the VR Auscultation Trainer, an immersive training environment design
 
 ## Description
 
-In the VR Auscultation Trainer, you don a Meta Quest headset and enter a virtual environment where a digital 3D model of a SAMII auscultation training dummy awaits. By interacting with the environment using your VR controllers, you can position a virtual stethoscope (represented by the controller grip) against various trigger points on the mannequin’s torso. Each trigger point is associated with a specific sound—such as normal bronchial breathing or heart sounds.
+In the VR Auscultation Trainer, you wear a Meta Quest headset and enter a virtual environment where a digital 3D model of a SAMII auscultation training dummy awaits. By interacting with the environment using your VR controllers, you can position a virtual stethoscope (represented by the controller grip) against various trigger points on the mannequin’s torso. Each trigger point is associated with a specific sound—such as normal bronchial breathing or heart sounds.
 
 For educational or testing scenarios, different sound sets (normal and intermediate) can be loaded dynamically. This allows trainees to practice identifying various auscultation findings without the need for physical equipment.
 
