@@ -142,7 +142,7 @@ If you don’t have an XR-capable device, you can use the [WebXR API Emulator](h
 
 ### Video Demo
 
-![VAT Video Demo](samples/VAT_Demo.MP4)
+[VAT Video Demo](https://drive.google.com/file/d/1wCKplsCzLhJTxFeJzx99UCQ7yz007Qck/view?usp=drivesdk)
 
 ## Development Challenges
 
