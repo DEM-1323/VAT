@@ -194,6 +194,7 @@ If you don’t have an XR-capable device, you can use the [WebXR API Emulator](h
 
 - **Performance Enhancements:** Optimize rendering and interaction for even smoother VR experiences.
 - **Add Collisions to Models:** Enable collisions on the bed model, walls, and around the SAMII model to prevent users from clipping through the models while maintaining the usability of interacting with the trigger points.
+- **Non-VR Device Support** - Implement support for non-VR devices, enabling interaction with the environment using standard keyboard and mouse controls in a regular browser, to allow for a broader range of users to access the training.
 
 ## Authors and Acknowledgements
 
