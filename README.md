@@ -140,6 +140,10 @@ If you don’t have an XR-capable device, you can use the [WebXR API Emulator](h
 
 ![GUI](samples/screenshots/gui.png)
 
+### Video Demo
+
+![VAT Video Demo](samples/VAT_Demo.MP4)
+
 ## Development Challenges
 
 ### UI and Interactivity
